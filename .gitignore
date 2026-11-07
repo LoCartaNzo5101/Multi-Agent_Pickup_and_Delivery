@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.envrc
+.venv/
+output.yaml
+*_tmp
+*.mp4
+__pycache__/

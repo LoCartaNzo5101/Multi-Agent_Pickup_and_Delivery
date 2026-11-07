@@ -29,9 +29,9 @@ if __name__ == '__main__':
                 s = [round(np.std(x), 2) for x in json_file[name.replace('_crowded', '')]['sim_times_list']][0:5] + [round(np.std(x), 2) for x in dic['sim_times_list']][0:5]
                 for i in range(5):
                     if 'pd' not in name:
-                        print('&', i, '&', c[i], '&', r[i], '&', s[i], '\\\\\cline{2-8}')
+                        print('&', i, '&', c[i], '&', r[i], '&', s[i], '\\\\\\cline{2-8}')
                     else:
-                        print('&', p_list[i], '&', c[i], '&', r[i], '&', s[i], '\\\\\cline{2-8}')
+                        print('&', p_list[i], '&', c[i], '&', r[i], '&', s[i], '\\\\\\cline{2-8}')
 
         for name, dic in json_file.items():
             plt.subplot(1, 3, 1)

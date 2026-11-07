@@ -1,5 +1,5 @@
-numpy
-matplotlib
+numpy>=1.25
+matplotlib>=3.6
 scipy
 ffmpeg-python
-PyYAML
+PyYAML>=5.1

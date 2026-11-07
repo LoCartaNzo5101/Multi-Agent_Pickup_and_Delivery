@@ -59,7 +59,7 @@ class MarkovChainsMaker(object):
                     if pos in self.prob_dic[t]:
                         prob_agents_same_pos_same_t = self.prob_dic[t][pos]
                         prob_agents_not_same_pos_same_t = [1 - x for x in prob_agents_same_pos_same_t]
-                        prob_no_agent_at_pos = np.product(prob_agents_not_same_pos_same_t)
+                        prob_no_agent_at_pos = np.prod(prob_agents_not_same_pos_same_t)
                         prob_at_least_one_agent_at_pos = 1 - prob_no_agent_at_pos
                         prob_at_least_one_conf_at_pos = prob_at_least_one_agent_at_pos * dist_dic[t][pos][0]
                         prob = prob + prob_at_least_one_conf_at_pos
@@ -71,7 +71,7 @@ class MarkovChainsMaker(object):
                 pos_conf_prob_at_t = tmp
         # Calculate probability of at least one conflict in path
         prob_no_conf_at_t = [1 - x for x in conf_prob_t_dic.values()]
-        prob_no_conf = np.product(prob_no_conf_at_t)
+        prob_no_conf = np.prod(prob_no_conf_at_t)
         prob_at_least_one_conf = 1 - prob_no_conf
         max = 0
         pos_tmp = 0
