@@ -77,3 +77,24 @@ python3 -m Utils.plot_experiments
 
 When a plot is closed, the next one will appear until the end of the experiments.
 
+
+## Code Flow of the High Level Algorithm
+The high level algorithm is implemented by the class `TokenPassingRecovery` in `Simulation/TP_with_recovery.py`. Task allocation and path planning are not separate modules: both happen inside its `time_forward()` method, which the simulator calls once per time step. The line numbers in the diagrams refer to `Simulation/TP_with_recovery.py`.
+
+<p align="center">
+    <img src="Docs/diagrams/time_forward_flow.svg" width="720" alt="Flow of TokenPassingRecovery.time_forward() in one time step"/>
+</p>
+
+<p align="justify">
+At every time step <code>time_forward()</code> runs five phases in order. First, agents that are idle on the delivery cell of their task have that task marked as completed and are unassigned (phase 1). Then agents that were delayed, or blocked because of a delay, have their planned path truncated to their current cell, so that they become idle and get replanned (phase 2). Phases 3 and 5 only run when <code>new_recovery=False</code> (<code>demo.py</code> uses <code>True</code>): phase 3 cuts paths that would cross an idle agent, and phase 5 advances the paths stored in the token, a job otherwise done by the simulator. Phase 4 is where tasks are allocated and paths are planned. After <code>time_forward()</code> returns, the simulator moves every agent one cell along its path, unless it is delayed or blocked, and the next time step starts.
+</p>
+
+<p align="center">
+    <img src="Docs/diagrams/allocation_loop.svg" width="720" alt="Allocation and path-planning loop inside time_forward()"/>
+    <br/>
+    <i>Zoom into phase 4 of the previous diagram: the allocation and path-planning loop executed for every idle agent.</i>
+</p>
+
+<p align="justify">
+Following Token Passing, idle agents are handled one at a time in random order. For the selected agent, the available tasks are those whose pickup and delivery cells are not the end of another agent's path nor the delivery cell of an already assigned task. If there is none, the agent stays where it is or, if it is standing on a task cell, moves to the closest free non-task endpoint. Otherwise a task is chosen: an agent that is being replanned after a delay keeps its own task, while a free agent gets the task with the closest pickup cell according to the Manhattan distance (<code>get_closest_task_name()</code>). The path is then planned in two legs with state-space A*, from the agent to the pickup cell and from the pickup cell to the delivery cell, treating the other agents as moving and static obstacles; the second leg starts at the time the agent reaches the pickup cell. If either leg has no solution, the agent waits and retries at the next time step, or <code>deadlock_recovery()</code> is called. Only when both legs are found is the task assigned and the full path written into the token, after which the next idle agent is handled.
+</p>
