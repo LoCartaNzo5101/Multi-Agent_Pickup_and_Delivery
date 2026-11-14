@@ -100,6 +100,7 @@ class TokenPassingRecovery(object):
         for task_name, task in available_tasks.items():
             if self.admissible_heuristic(task[0], agent_pos) < dist:
                 closest = task_name
+                dist = self.admissible_heuristic(task[0], agent_pos)
         return closest
 
     def get_moving_obstacles_agents(self, agents, time_start):
