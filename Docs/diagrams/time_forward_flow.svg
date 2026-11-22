@@ -5,23 +5,23 @@
 <text x="360" y="22" text-anchor="middle" font-size="12" fill="#8c959f">called once per time step by the simulator</text>
 <rect x="140" y="36" width="440" height="44" rx="6" fill="#ffffff" stroke="#d0d7de"/>
 <text x="360" y="55" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">1 · Update finished tasks</text>
-<text x="360" y="71" text-anchor="middle" font-size="11.5" fill="#57606a">L275–290 · idle at delivery cell → count it, unassign agent</text>
+<text x="360" y="71" text-anchor="middle" font-size="11.5" fill="#57606a">L280–297 · idle at delivery cell → count it, unassign agent</text>
 <line x1="360" y1="80" x2="360" y2="94" stroke="#57606a" marker-end="url(#ag)"/>
 <rect x="140" y="96" width="440" height="44" rx="6" fill="#ffffff" stroke="#d0d7de"/>
 <text x="360" y="115" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">2 · Handle delays</text>
-<text x="360" y="131" text-anchor="middle" font-size="11.5" fill="#57606a">L292–341 · cut delayed agents' paths to current cell → they replan</text>
+<text x="360" y="131" text-anchor="middle" font-size="11.5" fill="#57606a">L299–348 · cut delayed agents' paths to current cell → they replan</text>
 <line x1="360" y1="140" x2="360" y2="154" stroke="#57606a" marker-end="url(#ag)"/>
 <rect x="140" y="156" width="440" height="44" rx="6" fill="#ffffff" stroke="#afb8c1" stroke-dasharray="5 4"/>
 <text x="360" y="175" text-anchor="middle" font-size="13" font-weight="600" fill="#57606a">3 · Idle-collision check</text>
-<text x="360" y="191" text-anchor="middle" font-size="11.5" fill="#8c959f">L343–365 · paths crossing an idle agent are cut</text>
+<text x="360" y="191" text-anchor="middle" font-size="11.5" fill="#8c959f">L350–372 · paths crossing an idle agent are cut</text>
 <line x1="360" y1="200" x2="360" y2="214" stroke="#57606a" marker-end="url(#ag)"/>
 <rect x="140" y="216" width="440" height="44" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.5"/>
 <text x="360" y="235" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">4 · Allocate tasks + plan paths</text>
-<text x="360" y="251" text-anchor="middle" font-size="11.5" fill="#57606a">L367–456 · loop over idle agents (next diagram)</text>
+<text x="360" y="251" text-anchor="middle" font-size="11.5" fill="#57606a">L374–483 · loop over idle agents (next diagram)</text>
 <line x1="360" y1="260" x2="360" y2="274" stroke="#57606a" marker-end="url(#ag)"/>
 <rect x="140" y="276" width="440" height="44" rx="6" fill="#ffffff" stroke="#afb8c1" stroke-dasharray="5 4"/>
 <text x="360" y="295" text-anchor="middle" font-size="13" font-weight="600" fill="#57606a">5 · Advance token paths</text>
-<text x="360" y="311" text-anchor="middle" font-size="11.5" fill="#8c959f">L458–462 · drop first cell of each path</text>
+<text x="360" y="311" text-anchor="middle" font-size="11.5" fill="#8c959f">L485–489 · drop first cell of each path</text>
 <line x1="360" y1="320" x2="360" y2="334" stroke="#57606a" marker-end="url(#ag)"/>
 <rect x="140" y="336" width="440" height="40" rx="6" fill="#f3f4f6" stroke="#d0d7de"/>
 <text x="360" y="353" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">Simulator moves agents one step</text>
