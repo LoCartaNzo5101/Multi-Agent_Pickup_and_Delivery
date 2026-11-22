@@ -187,6 +187,19 @@ class TokenPassingRecovery(object):
             starts_goals.add(tuple(el['start']))
         return starts_goals
 
+    #Returns the tasks that the agent in agent_pos is allowed to take: those whose pickup and delivery cells are neither
+    #the end of another agent's path nor the delivery cell of an already assigned task
+    def get_available_tasks(self, agent_pos):
+        available_tasks = {}
+        for task_name, task in self.token['tasks'].items(): #"task" here is the pair of pickup and delivery positions of "task_name"
+            if (tuple(task[0]) not in self.token['path_ends'].difference({tuple(agent_pos)})
+                    and tuple(task[1]) not in self.token['path_ends'].difference({tuple(agent_pos)})
+                    and tuple(task[0]) not in self.get_agents_to_tasks_goals()
+                    and tuple(task[1]) not in self.get_agents_to_tasks_goals()
+                ):
+                available_tasks[task_name] = task
+        return available_tasks
+
     def get_completed_tasks(self):
         return self.token['completed_tasks']
 
@@ -383,6 +396,13 @@ class TokenPassingRecovery(object):
             self.token['tasks'][t['task_name']] = [t['start'], t['goal']]
             self.token['start_tasks_times'][t['task_name']] = self.simulation.get_time()
         idle_agents = self.get_idle_agents()
+        #########################################################
+        #Global task allocation hook: runs once per time step, before the agent loop, only for allocators that have a
+        #global step (e.g. hungarian). It receives the idle agents without a task and all the tasks not assigned yet
+        if self.task_allocator.has_global_step():
+            self.task_allocator.allocate({name: path[0] for name, path in idle_agents.items()
+                                          if name not in self.token['agents_to_tasks']},
+                                         dict(self.token['tasks']))
         while len(idle_agents) > 0:
             agent_name = random.choice(list(idle_agents.keys())) #name of the current idle agent
             # agent_name = list(idle_agents.keys())[0]
@@ -394,17 +414,16 @@ class TokenPassingRecovery(object):
             agent_pos = idle_agents.pop(agent_name)[0] #position of the current idle agent
             #########################################################
             #Build the list of available tasks
-            available_tasks = {}
-            for task_name, task in self.token['tasks'].items(): #"task" here is the pair of pickup and delivery positions of "task_name"
-                if (tuple(task[0]) not in self.token['path_ends'].difference({tuple(agent_pos)})
-                        and tuple(task[1]) not in self.token['path_ends'].difference({tuple(agent_pos)})
-                        and tuple(task[0]) not in self.get_agents_to_tasks_goals()
-                        and tuple(task[1]) not in self.get_agents_to_tasks_goals()
-                    ):
-                    available_tasks[task_name] = task
+            available_tasks = self.get_available_tasks(agent_pos)
             #########################################################
-            #Task allocation and path planning
-            if len(available_tasks) > 0 or agent_name in self.token['agents_to_tasks']:
+            #Task allocation: delegated to the selected allocator (-task_allocation, default greedy).
+            #Only for agents without a task; the allocator may return None to leave the agent without a task
+            selected_task_name = None
+            if agent_name not in self.token['agents_to_tasks'] and len(available_tasks) > 0:
+                selected_task_name = self.task_allocator.select_task(agent_name, agent_pos, available_tasks)
+            #########################################################
+            #Path planning
+            if selected_task_name is not None or agent_name in self.token['agents_to_tasks']:
                 #To compute the path of the agent we need to know through which cells it needs to pass through
                 #This branch covers the case of a task already being assigned to the current agent
                 if agent_name in self.token['agents_to_tasks']:
@@ -420,10 +439,7 @@ class TokenPassingRecovery(object):
                                         self.token['agents_to_tasks'][agent_name]['goal']]
                 #if the agent hasn't been assigned to any task we find a suitable one for it, and store its pickup and delivery locations
                 else:
-                    ######################################################
-                    #Task allocation: delegated to the selected allocator (-task_allocation, default greedy)
-                    closest_task_name = self.task_allocator.select_task(agent_name, agent_pos, available_tasks)
-                    ######################################################
+                    closest_task_name = selected_task_name
                     closest_task = available_tasks[closest_task_name]
                     
                 moving_obstacles_agents = self.get_moving_obstacles_agents(self.token['agents'], 0)
@@ -439,6 +455,8 @@ class TokenPassingRecovery(object):
                 path_to_task_start = self.search(cbs, agent_name, moving_obstacles_agents)
                 if not path_to_task_start:
                     print("Solution not found to task start for agent", agent_name, " idling at current position...")
+                    if selected_task_name is not None:
+                        self.task_allocator.planning_failed(agent_name, selected_task_name)
                     if len(self.token['delayed_agents']) == 0 and not self.token['prob_exceeded']:
                         print('Instance is not well-formed or a_star_max_iter is too low for this environment.')
                         self.deadlock_recovery(agent_name, agent_pos, all_idle_agents, all_delayed_agents, 4)
@@ -458,6 +476,8 @@ class TokenPassingRecovery(object):
                     path_to_task_goal = self.search(cbs, agent_name, moving_obstacles_agents)
                     if not path_to_task_goal:
                         print("Solution not found to task goal for agent", agent_name, " idling at current position...")
+                        if selected_task_name is not None:
+                            self.task_allocator.planning_failed(agent_name, selected_task_name)
                         if len(self.token['delayed_agents']) == 0 and not self.token['prob_exceeded']:
                             print('Instance is not well-formed  or a_star_max_iter is too low for this environment.')
                             self.deadlock_recovery(agent_name, agent_pos, all_idle_agents, all_delayed_agents, 4)
@@ -468,6 +488,7 @@ class TokenPassingRecovery(object):
                         if agent_name not in self.token['agents_to_tasks']:
                             self.token['tasks'].pop(closest_task_name)
                             task = available_tasks.pop(closest_task_name)
+                            self.task_allocator.task_assigned(agent_name, closest_task_name)
                         else:
                             task = closest_task
                         if agent_name in self.token['delayed_agents_after_task_start']:

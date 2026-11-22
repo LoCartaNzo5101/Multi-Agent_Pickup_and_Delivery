@@ -36,7 +36,7 @@ Then, to start the simulation, the script `demo.py` can be run. The script accep
     <li> <i>-a_star_max_iter</i>: an integer (a_star_max_iter >= 1, default 5000) which represents the maximum number of states explored by the low-level algorithm state-space A*; </li>
     <li> <i>-slow_factor</i>: an integer (slow_factor >= 1, default 1) which allows to slow down the visualization; </li>
     <li> <i>-not_rand</i>: this parameter needs to be present if the input environment is not randomized; </li>
-    <li> <i>-task_allocation</i>: the name of the task allocation algorithm to use (default <i>greedy</i>, the original closest-pickup rule of Token Passing). The available names are listed by <code>python3 demo.py -h</code>. </li>
+    <li> <i>-task_allocation</i>: the name of the task allocation algorithm to use. Available: <i>greedy</i> (default, the original closest-pickup rule of Token Passing) and <i>hungarian</i> (optimal joint assignment of the idle agents to the open tasks with the Hungarian method). The available names are also listed by <code>python3 demo.py -h</code>. </li>
 </ul>
 Note that if the script is run without both k and p, it becomes TP with recovery routines. If the visualization does not start after the end of the simulation, the error could be related to the non-GUI back-end of Matplotlib. To resolve this problem, restart the simulation after the following command has been run:
 <p></p> 
@@ -64,20 +64,30 @@ Run p-TP with p = 0.6, pd = 0.05 in a non-randomized environment:
 python3 demo.py -p 0.6 -pd 0.05 -not_rand
 ```
 
-Run with an explicitly selected task allocation algorithm (here the default greedy one):
+Run with the Hungarian method as task allocation algorithm:
 
 ```
-python3 demo.py -task_allocation greedy
+python3 demo.py -task_allocation hungarian
 ```
 
 ## Add a Task Allocation Algorithm
-Task allocation algorithms live in the <i>Simulation/TaskAllocation</i> package. To add one:
+Task allocation algorithms live in the <i>Simulation/TaskAllocation</i> package. At every time step, <code>TokenPassingRecovery.time_forward()</code> calls the selected allocator in two places:
+<ul>
+    <li> <code>allocate(agents, tasks)</code>: global hook, called once before the loop over the idle agents, with all the idle agents that have no task and all the tasks not assigned yet. It is called only if the allocator overrides it (see <code>has_global_step()</code>), so local allocators such as greedy skip it entirely; </li>
+    <li> <code>select_task(agent_name, agent_pos, available_tasks)</code>: called inside the loop for every idle agent without a task; it returns the name of the chosen task, or <code>None</code> to leave the agent without a task in this time step. After path planning, <code>task_assigned()</code> or <code>planning_failed()</code> tells the allocator how it went. </li>
+</ul>
+To add an algorithm:
 <ol>
-    <li> create a new file in <i>Simulation/TaskAllocation</i> with a subclass of <code>TaskAllocator</code> (see <code>base.py</code>), giving it a <code>name</code> and implementing <code>select_task(agent_name, agent_pos, available_tasks)</code>, which returns the name of the chosen task. Through <code>self.tp</code> the allocator can read the whole state of <code>TokenPassingRecovery</code> (token, other agents' paths, simulation time); </li>
+    <li> create a new file in <i>Simulation/TaskAllocation</i> with a subclass of <code>TaskAllocator</code> (see <code>base.py</code>) and give it a <code>name</code>:
+        <ul>
+            <li> for a local algorithm, which chooses the task of one agent at a time, implement <code>select_task()</code> (example: <code>GreedyAllocator</code> in <code>greedy.py</code>); </li>
+            <li> for a global algorithm, which assigns all the idle agents at once, subclass <code>GlobalTaskAllocator</code> and implement <code>compute_assignment(agents, tasks)</code>, returning a dictionary <code>{agent_name: task_name}</code> (example: <code>HungarianAllocator</code> in <code>hungarian.py</code>). The agent loop then plans the paths following that assignment; if the task reserved for an agent is no longer available when the agent is handled, or no path to it is found, the agent falls back to the closest task not reserved for another agent, and the assignment is recomputed at the next time step. </li>
+        </ul>
+        Through <code>self.tp</code> the allocator can read the whole state of <code>TokenPassingRecovery</code> (token, other agents' paths, simulation time, <code>get_available_tasks(agent_pos)</code>); </li>
     <li> register the class in the <code>ALLOCATORS</code> dictionary in <code>Simulation/TaskAllocation/__init__.py</code>; </li>
-    <li> run it with <code>python3 demo.py -task_allocation &lt;name&gt;</code>. </li>
+    <li> run it with <code>python3 demo.py -task_allocation &lt;name&gt;</code>, or set <code>args['task_allocation']</code> in the experiments run by <code>Utils/stats.py</code>. </li>
 </ol>
-<code>GreedyAllocator</code> in <code>greedy.py</code> is a complete example.
+The Hungarian allocator solves the assignment problem with <code>scipy.optimize.linear_sum_assignment</code>, which returns an optimal assignment (internally SciPy uses a modified Jonker-Volgenant algorithm, which reaches the same minimum total cost as the textbook Hungarian method). It minimizes the sum of the Manhattan distances between the agents and the pickup cells of their tasks (override <code>cost()</code> to change it); agent-task pairs where the task is not available for the agent are forbidden. If there are more agents than tasks some agents get no task, and if there are more tasks than agents the cheapest set of tasks is chosen.
 
 ## Run Multiple Experiments
 To run multiple experiments and collect all the statistics, a specific script, `run_all_experiments_new.py`, can be used. This script contains a list of experiments (easy to modify and extend) that will be run exploiting multi-threading; after all the experiments terminate a json file with the results will be saved in the <i>Experiments</i> folder. The script can be run with the following command:
@@ -102,7 +112,7 @@ The high level algorithm is implemented by the class `TokenPassingRecovery` in `
 </p>
 
 <p align="justify">
-At every time step <code>time_forward()</code> runs five phases in order. First, agents that are idle on the delivery cell of their task have that task marked as completed and are unassigned (phase 1). Then agents that were delayed, or blocked because of a delay, have their planned path truncated to their current cell, so that they become idle and get replanned (phase 2). Phases 3 and 5 only run when <code>new_recovery=False</code> (<code>demo.py</code> uses <code>True</code>): phase 3 cuts paths that would cross an idle agent, and phase 5 advances the paths stored in the token, a job otherwise done by the simulator. Phase 4 is where tasks are allocated and paths are planned. After <code>time_forward()</code> returns, the simulator moves every agent one cell along its path, unless it is delayed or blocked, and the next time step starts.
+At every time step <code>time_forward()</code> runs five phases in order. First, agents that are idle on the delivery cell of their task have that task marked as completed and are unassigned (phase 1). Then agents that were delayed, or blocked because of a delay, have their planned path truncated to their current cell, so that they become idle and get replanned (phase 2). Phases 3 and 5 only run when <code>new_recovery=False</code> (<code>demo.py</code> uses <code>True</code>): phase 3 cuts paths that would cross an idle agent, and phase 5 advances the paths stored in the token, a job otherwise done by the simulator. Phase 4 is where tasks are allocated and paths are planned: first the global allocation hook of the selected allocator runs once, then the idle agents are handled one at a time. After <code>time_forward()</code> returns, the simulator moves every agent one cell along its path, unless it is delayed or blocked, and the next time step starts.
 </p>
 
 <p align="center">
@@ -112,5 +122,5 @@ At every time step <code>time_forward()</code> runs five phases in order. First,
 </p>
 
 <p align="justify">
-Following Token Passing, idle agents are handled one at a time in random order. For the selected agent, the available tasks are those whose pickup and delivery cells are not the end of another agent's path nor the delivery cell of an already assigned task. If there is none, the agent stays where it is or, if it is standing on a task cell, moves to the closest free non-task endpoint. Otherwise a task is chosen: an agent that is being replanned after a delay keeps its own task, while a free agent gets the task with the closest pickup cell according to the Manhattan distance (<code>get_closest_task_name()</code>). The path is then planned in two legs with state-space A*, from the agent to the pickup cell and from the pickup cell to the delivery cell, treating the other agents as moving and static obstacles; the second leg starts at the time the agent reaches the pickup cell. If either leg has no solution, the agent waits and retries at the next time step, or <code>deadlock_recovery()</code> is called. Only when both legs are found is the task assigned and the full path written into the token, after which the next idle agent is handled.
+Before the loop, the global hook <code>allocate()</code> of the selected allocator can compute a joint assignment of all the idle agents to the open tasks (the Hungarian allocator does; for the greedy one the hook is skipped). Then, following Token Passing, idle agents are handled one at a time in random order. For the selected agent, the available tasks are those whose pickup and delivery cells are not the end of another agent's path nor the delivery cell of an already assigned task. If there is none, the agent stays where it is or, if it is standing on a task cell, moves to the closest free non-task endpoint. Otherwise a task is chosen: an agent that is being replanned after a delay keeps its own task, while a free agent gets the task returned by <code>select_task()</code> of the selected allocator: with greedy, the task with the closest pickup cell according to the Manhattan distance; with a global allocator, the task reserved for it by <code>allocate()</code>. If <code>select_task()</code> returns <code>None</code>, the agent is treated as if no task were available. The path is then planned in two legs with state-space A*, from the agent to the pickup cell and from the pickup cell to the delivery cell, treating the other agents as moving and static obstacles; the second leg starts at the time the agent reaches the pickup cell. If either leg has no solution, the allocator is notified with <code>planning_failed()</code> and the agent waits and retries at the next time step, or <code>deadlock_recovery()</code> is called. Only when both legs are found is the task assigned and the full path written into the token, after which the next idle agent is handled.
 </p>
