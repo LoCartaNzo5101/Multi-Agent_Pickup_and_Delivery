@@ -6,12 +6,13 @@ from math import fabs
 import random
 from Simulation.CBS.cbs import CBS, Environment
 from Simulation.markov_chains import MarkovChainsMaker
+from Simulation.TaskAllocation import get_allocator
 from collections import defaultdict
 
 
 class TokenPassingRecovery(object):
     def __init__(self, agents, dimesions, obstacles, non_task_endpoints, simulation, a_star_max_iter=4000, k=0,
-                 replan_every_k_delays=False, pd=None, p_max=1, p_iter=1, new_recovery=False):
+                 replan_every_k_delays=False, pd=None, p_max=1, p_iter=1, new_recovery=False, task_allocator=None):
         self.agents = agents
         self.dimensions = dimesions
         self.obstacles = set(obstacles)
@@ -58,6 +59,11 @@ class TokenPassingRecovery(object):
             self.pd = None
             self.p_iter = 1
         self.new_recovery = new_recovery
+        # Task allocation algorithm: a TaskAllocator instance, a registered name (str) or None (greedy)
+        if task_allocator is None or isinstance(task_allocator, str):
+            task_allocator = get_allocator(task_allocator)
+        self.task_allocator = task_allocator
+        self.task_allocator.attach(self)
         self.init_token()
 
     def init_token(self):
@@ -94,6 +100,7 @@ class TokenPassingRecovery(object):
     def admissible_heuristic(self, task_pos, agent_pos):
         return fabs(task_pos[0] - agent_pos[0]) + fabs(task_pos[1] - agent_pos[1])
 
+    # Original greedy rule, kept for reference: the same logic now lives in Simulation/TaskAllocation/greedy.py
     def get_closest_task_name(self, available_tasks, agent_pos):
         closest = random.choice(list(available_tasks.keys()))
         dist = self.admissible_heuristic(available_tasks[closest][0], agent_pos)
@@ -414,8 +421,8 @@ class TokenPassingRecovery(object):
                 #if the agent hasn't been assigned to any task we find a suitable one for it, and store its pickup and delivery locations
                 else:
                     ######################################################
-                    #Replace this line below with whatever task allocation call you want to make 
-                    closest_task_name = self.get_closest_task_name(available_tasks, agent_pos)
+                    #Task allocation: delegated to the selected allocator (-task_allocation, default greedy)
+                    closest_task_name = self.task_allocator.select_task(agent_name, agent_pos, available_tasks)
                     ######################################################
                     closest_task = available_tasks[closest_task_name]
                     

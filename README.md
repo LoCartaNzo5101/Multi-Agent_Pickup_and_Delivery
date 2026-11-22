@@ -35,7 +35,8 @@ Then, to start the simulation, the script `demo.py` can be run. The script accep
     <li> <i>-p_iter</i>: an integer (p_iter >= 1, default 1) which represents the number of times a new path can be recalculated if the one calculated before exceeds the probability threshold (used in p-TP); </li>
     <li> <i>-a_star_max_iter</i>: an integer (a_star_max_iter >= 1, default 5000) which represents the maximum number of states explored by the low-level algorithm state-space A*; </li>
     <li> <i>-slow_factor</i>: an integer (slow_factor >= 1, default 1) which allows to slow down the visualization; </li>
-    <li> <i>-not_rand</i>: this parameter needs to be present if the input environment is not randomized. </li>
+    <li> <i>-not_rand</i>: this parameter needs to be present if the input environment is not randomized; </li>
+    <li> <i>-task_allocation</i>: the name of the task allocation algorithm to use (default <i>greedy</i>, the original closest-pickup rule of Token Passing). The available names are listed by <code>python3 demo.py -h</code>. </li>
 </ul>
 Note that if the script is run without both k and p, it becomes TP with recovery routines. If the visualization does not start after the end of the simulation, the error could be related to the non-GUI back-end of Matplotlib. To resolve this problem, restart the simulation after the following command has been run:
 <p></p> 
@@ -62,6 +63,21 @@ Run p-TP with p = 0.6, pd = 0.05 in a non-randomized environment:
 ```
 python3 demo.py -p 0.6 -pd 0.05 -not_rand
 ```
+
+Run with an explicitly selected task allocation algorithm (here the default greedy one):
+
+```
+python3 demo.py -task_allocation greedy
+```
+
+## Add a Task Allocation Algorithm
+Task allocation algorithms live in the <i>Simulation/TaskAllocation</i> package. To add one:
+<ol>
+    <li> create a new file in <i>Simulation/TaskAllocation</i> with a subclass of <code>TaskAllocator</code> (see <code>base.py</code>), giving it a <code>name</code> and implementing <code>select_task(agent_name, agent_pos, available_tasks)</code>, which returns the name of the chosen task. Through <code>self.tp</code> the allocator can read the whole state of <code>TokenPassingRecovery</code> (token, other agents' paths, simulation time); </li>
+    <li> register the class in the <code>ALLOCATORS</code> dictionary in <code>Simulation/TaskAllocation/__init__.py</code>; </li>
+    <li> run it with <code>python3 demo.py -task_allocation &lt;name&gt;</code>. </li>
+</ol>
+<code>GreedyAllocator</code> in <code>greedy.py</code> is a complete example.
 
 ## Run Multiple Experiments
 To run multiple experiments and collect all the statistics, a specific script, `run_all_experiments_new.py`, can be used. This script contains a list of experiments (easy to modify and extend) that will be run exploiting multi-threading; after all the experiments terminate a json file with the results will be saved in the <i>Experiments</i> folder. The script can be run with the following command:
