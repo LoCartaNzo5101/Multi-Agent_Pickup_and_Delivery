@@ -103,14 +103,18 @@ class TokenPassingRecovery(object):
                 dist = self.admissible_heuristic(task[0], agent_pos)
         return closest
 
+    #Constructs the dict "obstacles" containing {(x, y, t): agent_name}, which are the cells at coordinates (x,y) occupied at time t 
+    #(in the local time frame) by agent "agent_name". The local time frame is the one used by the A* algorithm during computations, constructing
+    #the agent's paths from t_local=0
     def get_moving_obstacles_agents(self, agents, time_start):
         obstacles = {}
         for name, path in agents.items():
-            if len(path) > time_start and len(path) > 1:
-                for i in range(time_start, len(path)):
-                    k = i - time_start
+            if (len(path) > time_start #skips paths that are already over by the time the new leg starts
+                and len(path) > 1): #skips idle agents, including the agent being planned, since its path has length 1 
+                for i in range(time_start, len(path)): # Index i is the cell where agent "name" will be i steps from now
+                    k = i - time_start #convert to the local time frame  
                     obstacles[(path[i][0], path[i][1], k)] = name
-                    for j in range(1, self.k + 1):
+                    for j in range(1, self.k + 1): #self.k is the robustness parameter of k-TP; with k = 0 the loop body never runs.
                         if i - j >= time_start:
                             obstacles[(path[i][0], path[i][1], k - j)] = name
                         obstacles[(path[i][0], path[i][1], k + j)] = name
@@ -118,7 +122,7 @@ class TokenPassingRecovery(object):
                     if i == len(path) - 1:
                         obstacles[(path[i][0], path[i][1], -k)] = name
         return obstacles
-
+    #Constructs the set "obstacles" containing the positions of the cells occupied by idle or delayed agent at call time.
     def get_idle_obstacles_agents(self, agents_paths, delayed_agents, time_start):
         obstacles = set()
         for path in agents_paths:
@@ -272,6 +276,7 @@ class TokenPassingRecovery(object):
                     self.token['agents'][agent_name].append([el['x'], el['y']])
 
     def time_forward(self):
+        #######################################################################################
         # Update completed tasks
         for agent_name in self.token['agents']:
             pos = self.simulation.actual_paths[agent_name][-1]
@@ -290,7 +295,7 @@ class TokenPassingRecovery(object):
                     and self.token['agents_to_tasks'][agent_name]['task_name'] == 'safe_idle'
                 ):
                 self.token['agents_to_tasks'].pop(agent_name)
-
+        ######################################################################################
         # Check delayed agents and agents affected by delays
         if self.new_recovery:
             self.token['delayed_agents'] = self.simulation.get_delayed_agents()
@@ -365,7 +370,7 @@ class TokenPassingRecovery(object):
                             break
             self.token['agent_at_end_path'] = []
             self.token['agent_at_end_path_pos'] = []
-
+        #########################################################################################
         # Collect new tasks and assign them, if possible
         for t in self.simulation.get_new_tasks():
             self.token['tasks'][t['task_name']] = [t['start'], t['goal']]
@@ -380,7 +385,7 @@ class TokenPassingRecovery(object):
             if agent_name in all_delayed_agents: # not executed if no delays occur
                 all_delayed_agents.remove(agent_name)
             agent_pos = idle_agents.pop(agent_name)[0] #position of the current idle agent
-
+            #########################################################
             #Build the list of available tasks
             available_tasks = {}
             for task_name, task in self.token['tasks'].items(): #"task" here is the pair of pickup and delivery positions of "task_name"
@@ -390,7 +395,7 @@ class TokenPassingRecovery(object):
                         and tuple(task[1]) not in self.get_agents_to_tasks_goals()
                     ):
                     available_tasks[task_name] = task
-            
+            #########################################################
             #Task allocation and path planning
             if len(available_tasks) > 0 or agent_name in self.token['agents_to_tasks']:
                 #To compute the path of the agent we need to know through which cells it needs to pass through
@@ -408,17 +413,21 @@ class TokenPassingRecovery(object):
                                         self.token['agents_to_tasks'][agent_name]['goal']]
                 #if the agent hasn't been assigned to any task we find a suitable one for it, and store its pickup and delivery locations
                 else:
-                    ######Replace this line with whatever task allocation call you want to make 
+                    ######################################################
+                    #Replace this line below with whatever task allocation call you want to make 
                     closest_task_name = self.get_closest_task_name(available_tasks, agent_pos)
-                    #######################################
+                    ######################################################
                     closest_task = available_tasks[closest_task_name]
                     
                 moving_obstacles_agents = self.get_moving_obstacles_agents(self.token['agents'], 0)
                 idle_obstacles_agents = self.get_idle_obstacles_agents(all_idle_agents.values(), all_delayed_agents, 0)
+                #####################################################
+                #Compute path from current position to pickup location
                 #if closest_task[0]==agent_pos the first path will be only the cell occupied by the current agent in this time instance
                 agent = {'name': agent_name, 'start': agent_pos, 'goal': closest_task[0]}
                 env = Environment(self.dimensions, [agent], self.obstacles | idle_obstacles_agents,
-                                  moving_obstacles_agents, a_star_max_iter=self.a_star_max_iter)
+                                  moving_obstacles_agents, a_star_max_iter=self.a_star_max_iter) #describes the world the planner works in: grid dimensions,
+                                                                                                 #obstacles, agents
                 cbs = CBS(env)
                 path_to_task_start = self.search(cbs, agent_name, moving_obstacles_agents)
                 if not path_to_task_start:
@@ -433,6 +442,8 @@ class TokenPassingRecovery(object):
                     # Use cost - 1 because idle cost is 1
                     moving_obstacles_agents = self.get_moving_obstacles_agents(self.token['agents'], cost1 - 1)
                     idle_obstacles_agents = self.get_idle_obstacles_agents(all_idle_agents.values(), all_delayed_agents,cost1 - 1)
+                    ###################################################
+                    #Compute path from pickup location to destination location
                     agent = {'name': agent_name, 'start': closest_task[0], 'goal': closest_task[1]}
                     env = Environment(self.dimensions, [agent], self.obstacles | idle_obstacles_agents,
                                       moving_obstacles_agents, a_star_max_iter=self.a_star_max_iter)
