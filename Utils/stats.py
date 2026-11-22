@@ -28,6 +28,7 @@ def run_sim(param, n_sim, args, k_or_p_max):
     p_iter = args['p_iter']
     freq = args.get('task_freq', None)
     new_recovery = args['new_recovery']
+    task_allocation = args.get('task_allocation', None)  # None = greedy
     if pd is None:
         k = k_or_p_max
         p_max = 1
@@ -61,7 +62,8 @@ def run_sim(param, n_sim, args, k_or_p_max):
         #                          k=k, new_recovery=True)
         tp = TokenPassingRecovery(agents, dimensions, obstacles, non_task_endpoints, simulation,
                                   a_star_max_iter=a_star_max_iter, k=k, replan_every_k_delays=replan_every_k_delays,
-                                  pd=pd, p_max=p_max, p_iter=p_iter, new_recovery=new_recovery)
+                                  pd=pd, p_max=p_max, p_iter=p_iter, new_recovery=new_recovery,
+                                  task_allocator=task_allocation)
         start = time.time()
         while tp.get_completed_tasks() != len(tasks):
             simulation.time_forward(tp)

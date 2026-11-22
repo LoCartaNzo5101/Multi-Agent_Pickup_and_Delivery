@@ -1,19 +1,21 @@
 """
 Registry of the available task allocation algorithms.
 
-To add a new algorithm, implement a TaskAllocator subclass (see base.py) and add it to ALLOCATORS
+To add a new algorithm, implement a TaskAllocator (local) or GlobalTaskAllocator (global) subclass (see base.py) and add it to ALLOCATORS
 using the name that will be passed on the command line, e.g.:
 
     from Simulation.TaskAllocation.my_auction import AuctionAllocator
     ALLOCATORS[AuctionAllocator.name] = AuctionAllocator
 """
-from Simulation.TaskAllocation.base import TaskAllocator
+from Simulation.TaskAllocation.base import TaskAllocator, GlobalTaskAllocator
 from Simulation.TaskAllocation.greedy import GreedyAllocator
+from Simulation.TaskAllocation.hungarian import HungarianAllocator
 
 DEFAULT_ALLOCATOR = GreedyAllocator.name
 
 ALLOCATORS = {
     GreedyAllocator.name: GreedyAllocator,
+    HungarianAllocator.name: HungarianAllocator,
 }
 
 
